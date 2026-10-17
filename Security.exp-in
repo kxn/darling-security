@@ -2195,3 +2195,11 @@ _SecSetCustomHomeURLString
 _cuDec64
 _cuEnc64
 #endif
+// Modern cloud item client RPCs (backend errors are preserved).
+_SecItemUnsetCurrentItemsAcrossAllDevices
+_SecItemFetchCurrentItemOutOfBand
+_SecItemFetchPCSIdentityOutOfBand
+
+_SecItemFetchCurrentItemDataAcrossAllDevices
+_OBJC_CLASS_$_SecItemCurrentItemData
+_OBJC_METACLASS_$_SecItemCurrentItemData

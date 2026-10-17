@@ -337,6 +337,7 @@ extern const CFStringRef kSecAttrKeyTypeECSECPrimeRandomPKA
      __OSX_AVAILABLE(10.13) __IOS_AVAILABLE(11.0) __TVOS_AVAILABLE(11.0) __WATCHOS_AVAILABLE(4.0);
 extern const CFStringRef kSecAttrKeyTypeSecureEnclaveAttestation
      __OSX_AVAILABLE(10.13) __IOS_AVAILABLE(11.0) __TVOS_AVAILABLE(11.0) __WATCHOS_AVAILABLE(4.0);
+extern const CFStringRef kSecAttrKeyTypeSecureEnclaveAnonymousAttestation;
 
 // Should not be used, use kSecAttrTokenOID instead.
 extern const CFStringRef kSecAttrSecureEnclaveKeyBlob

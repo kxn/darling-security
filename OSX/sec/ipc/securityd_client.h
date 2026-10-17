@@ -477,6 +477,8 @@ XPC_RETURNS_RETAINED xpc_endpoint_t _SecSecuritydCopyEndpoint(enum SecXPCOperati
 #import <Foundation/NSXPCConnection.h>
 typedef void (^SecBoolNSErrorCallback) (bool, NSError*);
 
+@class CKKSCurrentItemQuery, CKKSCurrentItemQueryResult, CKKSPCSIdentityQuery, CKKSPCSIdentityQueryResult;
+
 @protocol SecuritydXPCCallbackProtocol <NSObject>
 - (void)callCallback: (bool) result error:(NSError*) error;
 @end
@@ -506,8 +508,20 @@ typedef void (^SecBoolNSErrorCallback) (bool, NSError*);
                                     identifier:(NSString*)identifier
                                       viewHint:(NSString*)viewHint
                                fetchCloudValue:(bool)fetchCloudValue
-                                      complete:(void (^) (NSData* persistentref, NSError* operror)) complete;
+                                      complete:(void (^) (NSData* persistentref, NSDate* cipModificationTime, NSError* operror)) complete;
 
+
+// Modern cloud item RPCs; declarations from Apple Security db15acbe.
+- (void)secItemUnsetCurrentItemsAcrossAllDevices:(NSString*)accessGroup
+                                     identifiers:(NSArray<NSString*>*)identifiers
+                                        viewHint:(NSString*)viewHint
+                                        complete:(void (^)(NSError* operror))complete;
+- (void)secItemFetchCurrentItemOutOfBand:(NSArray<CKKSCurrentItemQuery*>*)currentItemQueries
+                              forceFetch:(bool)forceFetch
+                                complete:(void (^)(NSArray<CKKSCurrentItemQueryResult*>* currentItems, NSError* operror)) complete;
+- (void)secItemFetchPCSIdentityByKeyOutOfBand:(NSArray<CKKSPCSIdentityQuery*>*)pcsIdentityQueries
+                                   forceFetch:(bool)forceFetch
+                                     complete:(void (^)(NSArray<CKKSPCSIdentityQueryResult*>* pcsIdentities, NSError* operror))complete;
 
 // For each item in the keychainClass, return a persistant reference and the digest of the value
 // The digest is not stable, and can change any time, the only promise is that if the digest

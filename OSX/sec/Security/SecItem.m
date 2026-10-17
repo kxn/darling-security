@@ -137,7 +137,7 @@ void SecItemFetchCurrentItemAcrossAllDevices(CFStringRef accessGroup,
                                           identifier:(__bridge NSString*)identifier
                                             viewHint:(__bridge NSString*)viewHint
                                      fetchCloudValue:fetchCloudValue
-                                            complete: ^(NSData* persistentRef, NSError* operror) {
+                                            complete: ^(NSData* persistentRef, NSDate* modificationTime, NSError* operror) {
                                                 complete((__bridge CFDataRef) persistentRef, (__bridge CFErrorRef) operror);
                                             }];
     }

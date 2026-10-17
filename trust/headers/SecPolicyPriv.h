@@ -1393,6 +1393,11 @@ __nullable CF_RETURNS_RETAINED
 SecPolicyRef SecPolicyCreateAppleExternalDeveloper(void)
     __OSX_AVAILABLE(10.12) __IOS_AVAILABLE(10.0) __TVOS_AVAILABLE(10.0) __WATCHOS_AVAILABLE(3.0);
 
+/* Constructs the same developer policy while allowing the caller to choose
+ * temporal-validity checking. Other anchor/chain/OID/EKU/key checks remain. */
+CF_EXPORT __nullable CF_RETURNS_RETAINED
+SecPolicyRef SecPolicyCreateAppleExternalDeveloperOptionalExpiry(bool checkExpiry);
+
 /*!
  @function SecPolicyCreateAppleSoftwareSigning
  @abstract Returns a policy object for verifying the Apple Software Signing certificate.

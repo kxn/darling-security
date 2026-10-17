@@ -1382,6 +1382,7 @@ _kSecAttrWasAlwaysSensitive
 _kSecAttrWasNeverExtractable
 _kSecAttrKeyTypeECSECPrimeRandomPKA
 _kSecAttrKeyTypeSecureEnclaveAttestation
+_kSecAttrKeyTypeSecureEnclaveAnonymousAttestation
 _kSecAttrSecureEnclaveKeyBlob
 #elif TARGET_OS_OSX
 
@@ -1535,6 +1536,7 @@ _kSecAttrWasAlwaysSensitive
 _kSecAttrWasNeverExtractable
 _kSecAttrKeyTypeECSECPrimeRandomPKA
 _kSecAttrKeyTypeSecureEnclaveAttestation
+_kSecAttrKeyTypeSecureEnclaveAnonymousAttestation
 _kSecAttrSecureEnclaveKeyBlob
 _kSecUseCertificatesWithMatchIssuers
 #endif // TARGET_OS_OSX

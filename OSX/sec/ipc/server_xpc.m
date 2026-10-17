@@ -222,12 +222,13 @@
                                     identifier:(NSString*)identifier
                                       viewHint:(NSString*)viewHint
                                fetchCloudValue:(bool)fetchCloudValue
-                                      complete:(void (^) (NSData* persistentref, NSError* operror))xpcComplete
+                                      complete:(void (^) (NSData* persistentref, NSDate* cipModificationTime, NSError* operror))xpcComplete
 {
 #if OCTAGON
     // The calling client might not handle CK types well. Sanitize!
+    // This legacy CKKS backend does not report a modification time.
     void (^complete)(NSData*, NSError*) = ^(NSData* persistentref, NSError* error){
-        xpcComplete(persistentref, XPCSanitizeError(error));
+        xpcComplete(persistentref, nil, XPCSanitizeError(error));
     };
 
     CFErrorRef cferror = NULL;
@@ -277,7 +278,7 @@
                                                                                 complete:complete];
                                                    }];
 #else // ! OCTAGON
-    xpcComplete(NULL, [NSError errorWithDomain:@"securityd" code:errSecParam userInfo:@{NSLocalizedDescriptionKey: @"SecItemFetchCurrentItemAcrossAllDevices not implemented on this platform"}]);
+    xpcComplete(NULL, nil, [NSError errorWithDomain:@"securityd" code:errSecParam userInfo:@{NSLocalizedDescriptionKey: @"SecItemFetchCurrentItemAcrossAllDevices not implemented on this platform"}]);
 #endif // OCTAGON
 }
 

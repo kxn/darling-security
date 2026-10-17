@@ -83,6 +83,7 @@ add_lib_ios_shim(SecTrustOSX
 		SecKey.m
 		SecKeyAdaptors.m
 		SecPolicy.c
+		SecPolicyExternalDeveloper.c
 		SecPolicyLeafCallbacks.c
 		SecRSAKey.c
 		SecServerEncryptionSupport.c
@@ -110,8 +111,10 @@ add_lib_ios_shim(SecItemShimOSX
 		SecImportExport.c
 		SecItem.c
 		SecItem.m
+		SecItemFetchOutOfBandValues.m
 		SecItemBackup.c
 		SecItemConstants.c
+		SecCryptoKitConstants.c
 		# SecItemRateLimit.m
 		SecKey.m
 		SecKeyAdaptors.m
@@ -122,6 +125,8 @@ add_lib_ios_shim(SecItemShimOSX
 
 		$<TARGET_OBJECTS:SecItemShimOSX_64bit_only>
 )
+
+set_source_files_properties(SecItemFetchOutOfBandValues.m PROPERTIES COMPILE_FLAGS "-fobjc-arc")
 
 add_lib_ios(logging
 	SOURCES

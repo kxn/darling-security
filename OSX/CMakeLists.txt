@@ -152,6 +152,7 @@ add_separated_framework(Security
 		# sec/Security/SecSharedCredential.m
 		sec/ipc/client.c
 		sec/ipc/client_endpoint.m
+		sec/Security/SecItemCloudRPC.m
 		utilities/SecCoreAnalytics.m
 		utilities/SecKnownFilePaths.m
 		utilities/SecPaddingConfigurations.c
@@ -356,3 +357,6 @@ set_target_properties(csparser PROPERTIES
 	PREFIX ""
 	SUFFIX ".bundle"
 )
+
+# The modern RPC client functions retain and bridge Objective-C block values.
+set_source_files_properties(sec/Security/SecItemCloudRPC.m PROPERTIES COMPILE_FLAGS "-fobjc-arc")
