@@ -115,6 +115,7 @@ add_lib_ios_shim(SecItemShimOSX
 		SecItemBackup.c
 		SecItemConstants.c
 		SecCryptoKitConstants.c
+		SecResourceConstants.c
 		# SecItemRateLimit.m
 		SecKey.m
 		SecKeyAdaptors.m
