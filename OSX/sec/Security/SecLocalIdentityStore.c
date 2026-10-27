@@ -17,6 +17,8 @@ extern bool SecCertificateIsValid(SecCertificateRef, CFAbsoluteTime);
 extern bool SecCertificateHasUnknownCriticalExtension(SecCertificateRef);
 extern SecKeyUsage SecCertificateGetKeyUsage(SecCertificateRef);
 extern CFArrayRef SecCertificateCopyExtendedKeyUsage(SecCertificateRef);
+extern CFDataRef SecCertificateCopyNormalizedIssuerSequence(SecCertificateRef);
+extern CFDataRef SecCertificateCopyNormalizedSubjectSequence(SecCertificateRef);
 #define BACKEND "/usr/lib/libDarlingLocalIdentitySecurityBackend.dylib"
 static int same(CFTypeRef a, CFTypeRef b) { return a && b && CFEqual(a,b); }
 static int istype(CFTypeRef a, CFTypeID t) { return a && CFGetTypeID(a)==t; }
@@ -64,6 +66,35 @@ static OSStatus read_store(const char *path, CFDictionaryRef *out) {
     if(!istype(v,CFNumberGetTypeID())||!CFNumberGetValue(v,kCFNumberIntType,&version)||version!=1||!istype(CFDictionaryGetValue(root,CFSTR("items")),CFArrayGetTypeID())||!istype(CFDictionaryGetValue(root,CFSTR("locked")),CFBooleanGetTypeID())){CFRelease(root);return errSecDecode;}
     if(flag(root,CFSTR("locked"))){CFRelease(root);return errSecInteractionNotAllowed;}
     *out=root;return errSecSuccess;
+}
+
+/* Supply candidate parents from the explicit local store.  Subject/issuer
+ * matching does not confer trust: trustd still checks signatures and anchors. */
+CFArrayRef SecItemCopyParentCertificates_osx(SecCertificateRef certificate, void *context) {
+    const char *path=getenv("LINUXCODE_IDENTITY_STORE");
+    if(!path||!*path){
+        void *backend=dlopen(BACKEND,RTLD_NOW|RTLD_LOCAL);
+        __typeof__(&SecItemCopyParentCertificates_osx) original=backend?dlsym(backend,"SecItemCopyParentCertificates_osx"):NULL;
+        return original?original(certificate,context):NULL;
+    }
+    if(!certificate||CFGetTypeID(certificate)!=SecCertificateGetTypeID())return NULL;
+    CFDictionaryRef store=NULL;if(read_store(path,&store))return NULL;
+    CFDataRef issuer=SecCertificateCopyNormalizedIssuerSequence(certificate);
+    CFMutableArrayRef parents=CFArrayCreateMutable(NULL,0,&kCFTypeArrayCallBacks);
+    CFArrayRef items=CFDictionaryGetValue(store,CFSTR("items"));int malformed=0;
+    for(CFIndex i=0;parents&&i<CFArrayGetCount(items);i++){
+        CFTypeRef record=CFArrayGetValueAtIndex(items,i);
+        CFTypeRef der=istype(record,CFDictionaryGetTypeID())?CFDictionaryGetValue(record,CFSTR("certificate")):NULL;
+        SecCertificateRef parent=istype(der,CFDataGetTypeID())?SecCertificateCreateWithData(NULL,der):NULL;
+        if(!parent){malformed=1;break;}
+        CFDataRef subject=SecCertificateCopyNormalizedSubjectSequence(parent);
+        if(same(issuer,subject))CFArrayAppendValue(parents,parent);
+        if(subject)CFRelease(subject);CFRelease(parent);
+    }
+    if(issuer)CFRelease(issuer);CFRelease(store);
+    if(malformed&&parents){CFRelease(parents);parents=NULL;}
+    if(getenv("LINUXCODE_IDENTITY_TRACE"))fprintf(stderr,"LOCAL_IDENTITY_PARENT_CANDIDATES %ld\n",parents?(long)CFArrayGetCount(parents):-1L);
+    return parents;
 }
 
 /* Version 1 stores identities, but has no persisted preference records.  An
