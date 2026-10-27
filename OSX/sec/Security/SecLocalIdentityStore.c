@@ -134,6 +134,48 @@ static OSStatus identity(CFDictionaryRef record, SecCertificateRef *cert, SecKey
     *ident=SecIdentityCreate(NULL,*cert,*key);return *ident?errSecSuccess:errSecAllocate;
 }
 
+/* Xcode resolves an enumerated certificate back to its signing identity with
+ * this legacy API. Search the opted-in default store by public key, including
+ * renewed certificates using the same key, then return a real native identity
+ * containing the caller's certificate. Explicit native keychain scopes retain
+ * their original implementation. No trust or policy decision is made here. */
+OSStatus SecIdentityCreateWithCertificate(CFTypeRef keychainOrArray,
+                                         SecCertificateRef certificate,
+                                         SecIdentityRef *result) {
+    if(result)*result=NULL;
+    const char *path=getenv("LINUXCODE_IDENTITY_STORE");
+    if(!path||!*path||keychainOrArray){
+        void *backend=dlopen(BACKEND,RTLD_NOW|RTLD_LOCAL);
+        __typeof__(&SecIdentityCreateWithCertificate) original=backend?dlsym(backend,"SecIdentityCreateWithCertificate"):NULL;
+        return original?original(keychainOrArray,certificate,result):errSecNotAvailable;
+    }
+    if(!result||!istype(certificate,SecCertificateGetTypeID()))return errSecParam;
+    CFDictionaryRef store=NULL;OSStatus status=read_store(path,&store);if(status)return status;
+    SecKeyRef wanted=SecCertificateCopyKey(certificate);
+    CFDataRef wantedBytes=wanted?SecKeyCopyExternalRepresentation(wanted,NULL):NULL;
+    if(wanted)CFRelease(wanted);
+    if(!wantedBytes){CFRelease(store);return errSecDecode;}
+    CFArrayRef items=CFDictionaryGetValue(store,CFSTR("items"));status=errSecItemNotFound;
+    for(CFIndex i=0;i<CFArrayGetCount(items);i++){
+        SecCertificateRef cert=NULL;SecKeyRef key=NULL;SecIdentityRef ident=NULL;
+        OSStatus itemStatus=identity(CFArrayGetValueAtIndex(items,i),&cert,&key,&ident);
+        if(!itemStatus){
+            SecKeyRef pub=SecKeyCopyPublicKey(key);
+            CFDataRef bytes=pub?SecKeyCopyExternalRepresentation(pub,NULL):NULL;
+            if(same(bytes,wantedBytes)){
+                *result=SecIdentityCreate(NULL,certificate,key);
+                status=*result?errSecSuccess:errSecAllocate;
+            }
+            if(bytes)CFRelease(bytes);if(pub)CFRelease(pub);
+        }else status=itemStatus;
+        if(ident)CFRelease(ident);if(key)CFRelease(key);if(cert)CFRelease(cert);
+        if(*result||itemStatus)break;
+    }
+    CFRelease(wantedBytes);CFRelease(store);
+    if(getenv("LINUXCODE_IDENTITY_TRACE"))fprintf(stderr,"LOCAL_IDENTITY_CERTIFICATE_LOOKUP_RESULT %d\n",(int)status);
+    return status;
+}
+
 OSStatus SecItemCopyMatching(CFDictionaryRef query, CFTypeRef *result) {
     if(result)*result=NULL;
     const char *path=getenv("LINUXCODE_IDENTITY_STORE");
