@@ -83,6 +83,10 @@ int main(int argc, char *argv[])
 	// tell the keychain (client) layer to turn off the server interface
 	SecKeychainSetServerMode();
 
+    // Like trustd, Darling uses the Linux process environment here.  The
+    // Darwin profile initializer is still ENOTSUP in libsystem_sandbox;
+    // do not advertise this daemon as enforcing the macOS named profile.
+#ifndef DARLING
     const char *params[] = {"LEGACY_TOKENS_ENABLED", "NO", NULL};
     char* errorbuf = NULL;
     if (sandbox_init_with_parameters("com.apple.securityd", SANDBOX_NAMED, params, &errorbuf)) {
@@ -94,6 +98,7 @@ int main(int argc, char *argv[])
     } else {
         secnotice("SecServer", "entered sandbox");
     }
+#endif
 
 	// program arguments (preset to defaults)
 	bool debugMode = false;
