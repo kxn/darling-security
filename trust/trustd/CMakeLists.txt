@@ -7,6 +7,7 @@ include_directories(
 add_lib_ios_shim(libtrustd
 	OUTPUT_NAME "trustd"
 	MODERN_OBJC
+	OBJC_ARC
 	SOURCES
 		CertificateTransparency.m
 		md.m
