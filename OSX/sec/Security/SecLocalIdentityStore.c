@@ -65,6 +65,15 @@ static OSStatus read_store(const char *path, CFDictionaryRef *out) {
     int version=0;CFTypeRef v=CFDictionaryGetValue(root,CFSTR("version"));
     if(!istype(v,CFNumberGetTypeID())||!CFNumberGetValue(v,kCFNumberIntType,&version)||version!=1||!istype(CFDictionaryGetValue(root,CFSTR("items")),CFArrayGetTypeID())||!istype(CFDictionaryGetValue(root,CFSTR("locked")),CFBooleanGetTypeID())){CFRelease(root);return errSecDecode;}
     if(flag(root,CFSTR("locked"))){CFRelease(root);return errSecInteractionNotAllowed;}
+    CFTypeRef certificates=CFDictionaryGetValue(root,CFSTR("certificates"));
+    if(certificates){
+        if(!istype(certificates,CFArrayGetTypeID())){CFRelease(root);return errSecDecode;}
+        for(CFIndex i=0;i<CFArrayGetCount(certificates);i++){
+            CFTypeRef der=CFArrayGetValueAtIndex(certificates,i);
+            SecCertificateRef cert=istype(der,CFDataGetTypeID())?SecCertificateCreateWithData(NULL,der):NULL;
+            if(!cert){CFRelease(root);return errSecDecode;}CFRelease(cert);
+        }
+    }
     *out=root;return errSecSuccess;
 }
 
@@ -88,7 +97,15 @@ CFArrayRef SecItemCopyParentCertificates_osx(SecCertificateRef certificate, void
         SecCertificateRef parent=istype(der,CFDataGetTypeID())?SecCertificateCreateWithData(NULL,der):NULL;
         if(!parent){malformed=1;break;}
         CFDataRef subject=SecCertificateCopyNormalizedSubjectSequence(parent);
-        if(same(issuer,subject))CFArrayAppendValue(parents,parent);
+        if(same(issuer,subject)&&!CFArrayContainsValue(parents,CFRangeMake(0,CFArrayGetCount(parents)),parent))CFArrayAppendValue(parents,parent);
+        if(subject)CFRelease(subject);CFRelease(parent);
+    }
+    CFArrayRef extras=CFDictionaryGetValue(store,CFSTR("certificates"));
+    for(CFIndex i=0;parents&&!malformed&&extras&&i<CFArrayGetCount(extras);i++){
+        SecCertificateRef parent=SecCertificateCreateWithData(NULL,CFArrayGetValueAtIndex(extras,i));
+        if(!parent){malformed=1;break;}
+        CFDataRef subject=SecCertificateCopyNormalizedSubjectSequence(parent);
+        if(same(issuer,subject)&&!CFArrayContainsValue(parents,CFRangeMake(0,CFArrayGetCount(parents)),parent))CFArrayAppendValue(parents,parent);
         if(subject)CFRelease(subject);CFRelease(parent);
     }
     if(issuer)CFRelease(issuer);CFRelease(store);
@@ -216,28 +233,38 @@ OSStatus SecItemCopyMatching(CFDictionaryRef query, CFTypeRef *result) {
     if(data&&!same(cls,kSecClassCertificate))return errSecParam;
     CFDictionaryRef store=NULL;OSStatus status=read_store(path,&store);if(status)return status;
     CFArrayRef items=CFDictionaryGetValue(store,CFSTR("items"));CFMutableArrayRef matches=CFArrayCreateMutable(NULL,0,&kCFTypeArrayCallBacks);
-    for(CFIndex i=0;i<CFArrayGetCount(items);i++){
+    CFArrayRef extras=CFDictionaryGetValue(store,CFSTR("certificates"));
+    CFIndex itemCount=CFArrayGetCount(items),extraCount=same(cls,kSecClassCertificate)&&extras?CFArrayGetCount(extras):0;
+    for(CFIndex i=0;i<itemCount+extraCount;i++){
         SecCertificateRef cert=NULL;SecKeyRef key=NULL;SecIdentityRef ident=NULL;
-        CFDictionaryRef item=CFArrayGetValueAtIndex(items,i);status=identity(item,&cert,&key,&ident);
+        CFStringRef itemLabel=NULL;
+        if(i<itemCount){
+            CFDictionaryRef item=CFArrayGetValueAtIndex(items,i);status=identity(item,&cert,&key,&ident);
+            if(!status)itemLabel=CFRetain(CFDictionaryGetValue(item,CFSTR("label")));
+        }else{
+            cert=SecCertificateCreateWithData(NULL,CFArrayGetValueAtIndex(extras,i-itemCount));status=cert?errSecSuccess:errSecDecode;
+            if(cert)itemLabel=SecCertificateCopySubjectSummary(cert);
+            if(!itemLabel)itemLabel=CFRetain(CFSTR(""));
+        }
         eligible=1;
         if(!status)status=leaf_policy(policy,cert,&eligible);
         if(!status&&canSign){
-            CFDictionaryRef attrs=SecKeyCopyAttributes(key);
+            CFDictionaryRef attrs=key?SecKeyCopyAttributes(key):NULL;
             int actual=attrs&&same(CFDictionaryGetValue(attrs,kSecAttrCanSign),kCFBooleanTrue);
             if(attrs)CFRelease(attrs);if(actual!=same(canSign,kCFBooleanTrue))eligible=0;
         }
-        if(!status&&eligible&&(!label||same(label,CFDictionaryGetValue(item,CFSTR("label"))))){
+        if(!status&&eligible&&(!label||same(label,itemLabel))){
             CFTypeRef object=same(cls,kSecClassIdentity)?(CFTypeRef)ident:same(cls,kSecClassCertificate)?(CFTypeRef)cert:(CFTypeRef)key;
             CFDataRef der=data?SecCertificateCopyData(cert):NULL;
             CFTypeRef value=NULL;
             if(attributes||(ref&&data)){
                 CFMutableDictionaryRef d=CFDictionaryCreateMutable(NULL,0,&kCFTypeDictionaryKeyCallBacks,&kCFTypeDictionaryValueCallBacks);
-                if(attributes){CFDictionarySetValue(d,kSecClass,cls);CFDictionarySetValue(d,kSecAttrLabel,CFDictionaryGetValue(item,CFSTR("label")));}
+                if(attributes){CFDictionarySetValue(d,kSecClass,cls);CFDictionarySetValue(d,kSecAttrLabel,itemLabel);}
                 if(ref)CFDictionarySetValue(d,kSecValueRef,object);if(data)CFDictionarySetValue(d,kSecValueData,der);value=d;
             }else value=CFRetain(ref?object:data?(CFTypeRef)der:(CFTypeRef)kCFBooleanTrue);
             CFArrayAppendValue(matches,value);CFRelease(value);if(der)CFRelease(der);
         }
-        if(ident)CFRelease(ident);if(key)CFRelease(key);if(cert)CFRelease(cert);
+        if(itemLabel)CFRelease(itemLabel);if(ident)CFRelease(ident);if(key)CFRelease(key);if(cert)CFRelease(cert);
         if(status)break;
     }
     if(!status&&!CFArrayGetCount(matches))status=errSecItemNotFound;
